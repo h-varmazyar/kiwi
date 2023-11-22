@@ -1,0 +1,59 @@
+version: '3.7'
+
+networks:
+  kiwi:
+    external: true
+
+services:
+  postgres:
+    container_name: kiwi_postgres
+    image: postgres
+    environment:
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD}
+    volumes:
+      - postgres_kiwi_data:/var/lib/postgresql/data
+    networks:
+      - kiwi
+    ports:
+      - 5432:5432
+    restart: always
+
+  redis:
+    container_name: kiwi_redis
+    image: bitnami/redis:latest
+    command: redis-server --requirepass ${REDIS_PASSWORD}
+    environment:
+      - ALLOW_EMPTY_PASSWORD=no
+    volumes:
+      - redis_kiwi_data:/var/lib/redis
+    networks:
+      - kiwi
+    ports:
+      - 6379:6379
+    restart: always
+
+  film:
+    container_name: film
+    image: ${FILM_IMAGE:-film}:${PROXY_VERSION:-latest}
+    volumes:
+      - /srv/kiwi/configs/film/app.yaml:/app/configs/config.yaml
+    networks:
+      - kiwi
+    depends_on:
+      - postgres
+    restart: always
+
+  proxy:
+    container_name: proxy
+    image: ${PROXY_IMAGE:-proxy}:${PROXY_VERSION:-latest}
+    volumes:
+      - /srv/kiwi/configs/proxy/app.yaml:/app/configs/config.yaml
+    networks:
+      - kiwi
+    depends_on:
+      - postgres
+    restart: always
+
+volumes:
+  postgres_kiwi_data:
+  redis_kiwi_data:
