@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
-	repositories2 "github.com/h-varmazyar/kiwi/applications/film/internal/repositories"
+	repositories "github.com/h-varmazyar/kiwi/applications/film/internal/repositories"
 	"github.com/h-varmazyar/kiwi/applications/film/pkg/db/PostgreSQL"
 	redisPkg "github.com/h-varmazyar/kiwi/applications/film/pkg/db/redis"
 	log "github.com/sirupsen/logrus"
@@ -13,47 +13,44 @@ import (
 )
 
 type Configs struct {
-	AdminChatId     int64
-	RedisDB         int
-	PublicChannelId int64
-	RedisConfigs    *redisPkg.Configs
+	AdminChatId     int64             `yaml:"adminChatId"`
+	RedisDB         int               `yaml:"redisDB"`
+	PublicChannelId int64             `yaml:"publicChannelId"`
+	RedisConfigs    *redisPkg.Configs `yaml:"-"`
 }
 
 type Handler struct {
-	configs             *Configs
+	configs             Configs
 	log                 *log.Logger
-	userStateRepository *repositories2.UserStateRepository
-	addContentRepo      *repositories2.AddContentRepository
-	mediaRepo           *repositories2.MediaRepository
-	seriesRepo          *repositories2.SeriesRepository
-	episodeRepo         *repositories2.EpisodeRepository
-	seasonRepo          *repositories2.SeasonRepository
-	userStateRepo       *repositories2.UserStateRepository
+	userStateRepository *repositories.UserStateRepository
+	addContentRepo      *repositories.AddContentRepository
+	mediaRepo           *repositories.MediaRepository
+	seriesRepo          *repositories.SeriesRepository
+	episodeRepo         *repositories.EpisodeRepository
+	seasonRepo          *repositories.SeasonRepository
+	userStateRepo       *repositories.UserStateRepository
 }
 
-func NewHandler(ctx context.Context, log *log.Logger, configs *Configs, db *db.DB) (*Handler, error) {
+func NewHandler(ctx context.Context, log *log.Logger, configs Configs, db *db.DB) (*Handler, error) {
 	configs.RedisConfigs.DB = configs.RedisDB
 	redisClient := redisPkg.NewClient(configs.RedisConfigs)
 
-	userStateRepo := repositories2.NewUserState(redisClient)
-	addContentRepo := repositories2.NewAddContentRepository(redisClient)
-	//genreRepo, err := repositories2.NewGenreRepository(ctx, log, db)
-	//if err != nil {
-	//	return nil, err
-	//}
-	mediaRepo, err := repositories2.NewMediaRepository(ctx, log, db)
+	userStateRepo := repositories.NewUserState(redisClient)
+	addContentRepo := repositories.NewAddContentRepository(redisClient)
+
+	mediaRepo, err := repositories.NewMediaRepository(ctx, log, db)
 	if err != nil {
 		return nil, err
 	}
-	episodeRepo, err := repositories2.NewEpisodeRepository(ctx, log, db)
+	episodeRepo, err := repositories.NewEpisodeRepository(ctx, log, db)
 	if err != nil {
 		return nil, err
 	}
-	seasonRepo, err := repositories2.NewSeasonRepository(ctx, log, db)
+	seasonRepo, err := repositories.NewSeasonRepository(ctx, log, db)
 	if err != nil {
 		return nil, err
 	}
-	seriesRepo, err := repositories2.NewSeriesRepository(ctx, log, db)
+	seriesRepo, err := repositories.NewSeriesRepository(ctx, log, db)
 	if err != nil {
 		return nil, err
 	}
@@ -94,14 +91,14 @@ func (h *Handler) handleMessage(ctx context.Context, b *bot.Bot, update *models.
 		return
 	}
 	switch state {
-	case repositories2.StateAddSeries:
-	case repositories2.StateAddEpisode:
+	case repositories.StateAddSeries:
+	case repositories.StateAddEpisode:
 		h.stateAddEpisode(ctx, b, update)
-	case repositories2.StateAddEpisodeBanner:
+	case repositories.StateAddEpisodeBanner:
 		h.stateAddEpisodeBanner(ctx, b, update)
-	case repositories2.StateAddEpisodeVideo:
+	case repositories.StateAddEpisodeVideo:
 		h.stateAddMedia(ctx, b, update)
-	case repositories2.StateAddBanner:
+	case repositories.StateAddBanner:
 		//h.addHandler.AddBannerState(ctx, b, update)
 	default:
 		h.search(ctx, b, update)

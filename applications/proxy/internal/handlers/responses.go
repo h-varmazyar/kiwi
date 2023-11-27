@@ -30,3 +30,7 @@ func respProxyCaption(proxyLinks []string) string {
 
 	return caption
 }
+
+var (
+	responseContentSaved = "محتوا با موفقیت افزوده شد"
+)

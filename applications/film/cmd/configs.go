@@ -7,8 +7,9 @@ import (
 )
 
 type Configs struct {
-	Version  string            `yaml:"version"`
-	DB       *gormext.Configs  `yaml:"db"`
-	Redis    *redisPkg.Configs `yaml:"redis"`
-	Handlers *handlers.Configs `yaml:"handlers"`
+	Version  string           `yaml:"version"`
+	BotToken string           `yaml:"botToken"`
+	DB       gormext.Configs  `yaml:"db"`
+	Redis    redisPkg.Configs `yaml:"redis"`
+	Handlers handlers.Configs `yaml:"handlers"`
 }

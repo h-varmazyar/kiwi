@@ -8,7 +8,7 @@ import (
 	"github.com/h-varmazyar/kiwi/pkg/tgBotHelpers"
 )
 
-func (h *Handler) handleMedia(ctx context.Context, bot *bot.Bot, update *models.Update) {
+func (h *Handler) handleMedia(ctx context.Context, b *bot.Bot, update *models.Update) {
 	if update.Message == nil {
 		h.log.WithError(errUnsupportedMessage.AddDetail("msg", update))
 		return
@@ -19,20 +19,38 @@ func (h *Handler) handleMedia(ctx context.Context, bot *bot.Bot, update *models.
 			ChatId: chatId,
 			Err:    errInvalidContent,
 		}
-		tgBotHelpers.SendError(ctx, bot, params)
+		tgBotHelpers.SendError(ctx, b, params)
 		return
 	}
-	for _, photo := range update.Message.Photo {
-		post := &entities.Post{
-			FileId: photo.FileID,
+
+	photo := update.Message.Photo[0]
+	for _, p := range update.Message.Photo[1:] {
+		if photo.FileSize < p.FileSize {
+			photo = p
 		}
-		if err := h.postRepo.Create(ctx, post); err != nil {
-			params := &tgBotHelpers.ErrParams{
-				ChatId: chatId,
-				Err:    err,
-			}
-			tgBotHelpers.SendError(ctx, bot, params)
-			return
+	}
+
+	post := &entities.Post{
+		FileId: photo.FileID,
+	}
+	if err := h.postRepo.Create(ctx, post); err != nil {
+		params := &tgBotHelpers.ErrParams{
+			ChatId: chatId,
+			Err:    err,
 		}
+		tgBotHelpers.SendError(ctx, b, params)
+		return
+	}
+
+	if _, err := b.SendMessage(ctx, &bot.SendMessageParams{
+		ChatID: chatId,
+		Text:   responseContentSaved,
+	}); err != nil {
+		params := &tgBotHelpers.ErrParams{
+			ChatId:   chatId,
+			IsSilent: true,
+			Err:      err,
+		}
+		tgBotHelpers.SendError(ctx, b, params)
 	}
 }

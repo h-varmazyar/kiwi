@@ -1,14 +1,15 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
-	gormext "github.com/h-varmazyar/gopack/gorm"
 	"github.com/h-varmazyar/kiwi/applications/film/internal/handlers"
-	dbPkg "github.com/h-varmazyar/kiwi/applications/film/pkg/db/PostgreSQL"
-	redisPkg "github.com/h-varmazyar/kiwi/applications/film/pkg/db/redis"
-	log "github.com/sirupsen/logrus"
+	db2 "github.com/h-varmazyar/kiwi/applications/film/pkg/db/PostgreSQL"
+	"github.com/h-varmazyar/kiwi/applications/proxy/configs"
+	log2 "github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 	"os"
 	"os/signal"
 )
@@ -17,64 +18,81 @@ const (
 	defaultMsg = "خطا در پردازش پیام"
 )
 
+var (
+	conf *Configs
+)
+
 func main() {
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)
 	defer cancel()
 
-	opts := []bot.Option{
-		bot.WithDefaultHandler(defaultHandler),
-		bot.WithMiddlewares(addLang),
-	}
+	log := new(log2.Logger)
 
-	b, err := bot.New("1972400420:AAHtOEYNhbaNz-Xm27MEP1BYa0cB2QG7APw", opts...)
-	if err != nil {
+	var err error
+	if conf, err = prepareConfigs(ctx, log); err != nil {
 		panic(err)
 	}
 
-	redisConf := &redisPkg.Configs{
-		Host:     "localhost",
-		Port:     6379,
-		Password: "",
-	}
-	conf := &handlers.Configs{
-		AdminChatId:     1689926,
-		PublicChannelId: -1001803420363,
-		RedisDB:         1,
-		RedisConfigs:    redisConf,
-	}
-
-	dbConf := gormext.Configs{
-		DbType:      gormext.PostgreSQL,
-		Port:        5433,
-		Host:        "localhost",
-		Username:    "postgres",
-		Password:    "postgres",
-		Name:        "kiwi",
-		IsSSLEnable: false,
-	}
-
-	db, err := dbPkg.NewDatabase(ctx, dbConf)
-	if err != nil {
+	var db *db2.DB
+	if db, err = db2.NewDatabase(ctx, conf.DB); err != nil {
 		panic(err)
 	}
 
-	botHandlers, err := handlers.NewHandler(ctx, new(log.Logger), conf, db)
-	if err != nil {
+	var b *bot.Bot
+	if b, err = prepareBot(ctx, log, db); err != nil {
 		panic(err)
 	}
-	botHandlers.RegisterHandlers(ctx, b)
-
 	b.Start(ctx)
 }
 
-func defaultHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
-	_, err := b.SendMessage(ctx, &bot.SendMessageParams{
-		ChatID: update.Message.Chat.ID,
-		Text:   defaultMsg,
-	})
-	if err != nil {
-		log.WithError(err).Error("failed to send default message")
+func prepareConfigs(_ context.Context, log *log2.Logger) (*Configs, error) {
+	log.Infof("reding configs...")
+
+	viper.AutomaticEnv()
+	if err := viper.ReadInConfig(); err != nil {
+		log.Warnf("failed to read from env: %v", err)
+		viper.AddConfigPath("./configs")  //path for docker compose configs
+		viper.AddConfigPath("../configs") //path for local configs
+		viper.SetConfigName("config")
+		viper.SetConfigType("yaml")
+		if err = viper.ReadInConfig(); err != nil {
+			log.Warnf("failed to read from yaml: %v", err)
+			localErr := viper.ReadConfig(bytes.NewBuffer(configs.DefaultConfig))
+			if localErr != nil {
+				log.WithError(localErr).Error("read from default configs failed")
+				return nil, localErr
+			}
+		}
 	}
+
+	conf := new(Configs)
+	if err := viper.Unmarshal(conf); err != nil {
+		log.Errorf("faeiled unmarshal")
+		return nil, err
+	}
+
+	conf.Handlers.RedisConfigs = &conf.Redis
+
+	return conf, nil
+}
+
+func prepareBot(ctx context.Context, log *log2.Logger, db *db2.DB) (*bot.Bot, error) {
+	opts := []bot.Option{
+		bot.WithMiddlewares(addLang),
+	}
+	b, err := bot.New(conf.BotToken, opts...)
+	if err != nil {
+		log.WithError(err).Error("failed to create new bot")
+		return nil, err
+	}
+	botHandlers, err := handlers.NewHandler(ctx, log, conf.Handlers, db)
+	if err != nil {
+		log.WithError(err).Error("failed to create bot handlers")
+		return nil, err
+	}
+	botHandlers.RegisterHandlers(ctx, b)
+
+	return b, nil
 }
 
 func addLang(next bot.HandlerFunc) bot.HandlerFunc {

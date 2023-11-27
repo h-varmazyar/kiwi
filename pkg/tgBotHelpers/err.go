@@ -40,13 +40,16 @@ func SendError(ctx context.Context, b *bot.Bot, params *ErrParams) {
 		}
 	}
 
-	fmt.Println(er)
+	fmt.Println("error:", er)
 
 	if !params.IsSilent {
-		_, _ = b.SendMessage(ctx, &bot.SendMessageParams{
+		_, err := b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID:           params.ChatId,
 			Text:             params.Msg,
 			ReplyToMessageID: params.ReplyToMessageId,
 		})
+		if err != nil {
+			fmt.Println("failed to send error:", err)
+		}
 	}
 }

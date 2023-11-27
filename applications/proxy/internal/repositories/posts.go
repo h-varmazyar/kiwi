@@ -68,7 +68,7 @@ func (r *PostRepository) migration(_ context.Context, dbInstance *db.DB) error {
 }
 
 func (r *PostRepository) Create(_ context.Context, post *entities.Post) error {
-	return r.PostgresDB.Save(post).Error
+	return r.PostgresDB.Create(post).Error
 }
 
 func (r *PostRepository) NewUnused(_ context.Context) (*entities.Post, error) {
