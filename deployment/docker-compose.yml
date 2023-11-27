@@ -34,7 +34,10 @@ services:
 
   film:
     container_name: film
-    image: ${FILM_IMAGE:-film}:${PROXY_VERSION:-latest}
+    image: ${FILM_IMAGE:-film}:${FILM_VERSION:-latest}
+    build:
+      context: ..
+      dockerfile: applications/film/deploy/Dockerfile
     volumes:
       - /srv/kiwi/configs/film/app.yaml:/app/configs/config.yaml
     networks:
@@ -46,6 +49,10 @@ services:
   proxy:
     container_name: proxy
     image: ${PROXY_IMAGE:-proxy}:${PROXY_VERSION:-latest}
+    build:
+      context: ..
+      dockerfile: applications/proxy/deploy/Dockerfile
+
     volumes:
       - /srv/kiwi/configs/proxy/app.yaml:/app/configs/config.yaml
     networks:

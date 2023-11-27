@@ -1,34 +1,24 @@
 package main
 
 import (
+	"bytes"
 	"context"
-	"fmt"
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
-	gormext "github.com/h-varmazyar/gopack/gorm"
+	"github.com/h-varmazyar/kiwi/applications/proxy/configs"
+	"github.com/h-varmazyar/kiwi/applications/proxy/internal/handlers"
 	"github.com/h-varmazyar/kiwi/applications/proxy/internal/repositories"
 	db2 "github.com/h-varmazyar/kiwi/applications/proxy/pkg/db/PostgreSQL"
-	"github.com/h-varmazyar/kiwi/applications/proxy/pkg/entities"
 	log2 "github.com/sirupsen/logrus"
+	"github.com/spf13/viper"
 	"os"
 	"os/signal"
+	"strconv"
+	"strings"
 )
-
-const (
-	defaultMsg = "خطا در پردازش پیام"
-)
-
-type Configs struct {
-	AdminChatId      int64
-	PublishChannelId int64
-	ContentChannelId int64
-	TelMtProto       int64
-	PowerfulProxy    int64
-}
 
 var (
-	conf     *Configs
-	postRepo *repositories.PostRepository
+	conf *Configs
 )
 
 func main() {
@@ -36,144 +26,100 @@ func main() {
 	defer cancel()
 
 	log := new(log2.Logger)
-	conf = &Configs{
-		AdminChatId:      1689926,
-		PublishChannelId: -1002018115271,
-		ContentChannelId: -1002132165405,
-		TelMtProto:       -1002077953578,
-		PowerfulProxy:    -1002077953578,
-	}
-
-	dbConf := gormext.Configs{
-		DbType:      gormext.PostgreSQL,
-		Port:        5433,
-		Host:        "localhost",
-		Username:    "postgres",
-		Password:    "postgres",
-		Name:        "proxy",
-		IsSSLEnable: false,
-	}
-
-	db, err := db2.NewDatabase(ctx, dbConf)
-	if err != nil {
+	var err error
+	if conf, err = prepareConfigs(ctx, log); err != nil {
 		panic(err)
 	}
 
-	postRepo, err = repositories.NewPostRepository(ctx, log, db)
-	if err != nil {
+	var db *db2.DB
+	if db, err = db2.NewDatabase(ctx, conf.DB); err != nil {
 		panic(err)
 	}
 
-	opts := []bot.Option{
-		bot.WithDefaultHandler(defaultHandler),
-		bot.WithMiddlewares(addLang),
-	}
-
-	b, err := bot.New("1050203162:AAG298gFzWIn7ZS_2WAnnM8QglAFPG9tueQ", opts...)
-	if err != nil {
+	var postRepo *repositories.PostRepository
+	if postRepo, err = repositories.NewPostRepository(ctx, log, db); err != nil {
 		panic(err)
 	}
 
-	//conf := &handlers.Configs{
-	//	AdminChatId:     1689926,
-	//	PublicChannelId: -1001803420363,
-	//	RedisDB:         1,
-	//	RedisConfigs:    redisConf,
-	//}
-	//
-	//botHandlers, err := handlers.NewHandler(ctx, new(log.Logger), conf)
-	//if err != nil {
-	//	panic(err)
-	//}
-	//botHandlers.RegisterHandlers(ctx, b)
-
+	var b *bot.Bot
+	if b, err = prepareBot(ctx, log, postRepo); err != nil {
+		panic(err)
+	}
 	b.Start(ctx)
 }
 
-func defaultHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
-	proxyLinks := make([]string, 0)
-	if update.ChannelPost != nil {
-		switch update.ChannelPost.Chat.ID {
-		case conf.TelMtProto,
-			conf.PowerfulProxy:
-			if k := update.ChannelPost.ReplyMarkup.InlineKeyboard; k != nil {
-				if len(k) == 0 {
-					return
-				}
-				if len(k[0]) == 0 {
-					return
-				}
-				for _, button := range k[0] {
-					proxyLinks = append(proxyLinks, button.URL)
-				}
-			}
+func prepareConfigs(_ context.Context, log *log2.Logger) (*Configs, error) {
+	log.Infof("reding configs...")
 
-			if len(proxyLinks) > 0 {
-				photo, err := postRepo.NewUnused(ctx)
-				if err != nil {
-					fmt.Println("unused post:", err)
-					return
-				}
-				photoFile := &models.InputFileString{
-					Data: photo.FileId,
-				}
-				proxyBtn := models.InlineKeyboardMarkup{
-					InlineKeyboard: make([][]models.InlineKeyboardButton, 0),
-				}
-				row := make([]models.InlineKeyboardButton, 0)
-				proxyLinksText := ""
-				for i, link := range proxyLinks {
-					proxyLinksText = fmt.Sprintf("%v *[اتصال به پروکسی ✅](%v)*\n", proxyLinksText, link)
-					btn := models.InlineKeyboardButton{
-						Text: "اتصال ✅",
-						URL:  link,
-					}
-					row = append(row, btn)
-					if i%2 == 1 || i == len(proxyLinks)-1 {
-						proxyBtn.InlineKeyboard = append(proxyBtn.InlineKeyboard, row)
-						row = make([]models.InlineKeyboardButton, 0)
-					}
-				}
-
-				caption := `
-☑️ پروکسی ضد فیلتر و پر سرعت
-
-🔘لطفا پروکسی ها را برای دوستان خود هم ارسال کنید تا استفاده کنند🙏
-
-%v
-
-@kiwi\_proxy
-`
-
-				caption = fmt.Sprintf(caption, proxyLinksText)
-				_, err = b.SendPhoto(ctx, &bot.SendPhotoParams{
-					ChatID:      conf.PublishChannelId,
-					Photo:       photoFile,
-					Caption:     caption,
-					ParseMode:   models.ParseModeMarkdown,
-					ReplyMarkup: proxyBtn,
-				})
-				if err != nil {
-					fmt.Println(err)
-				}
-			}
-		case conf.ContentChannelId:
-			if len(update.ChannelPost.Photo) > 0 {
-				post := &entities.Post{
-					FileId: update.ChannelPost.Photo[0].FileID,
-				}
-
-				if err := postRepo.Create(ctx, post); err != nil {
-					fmt.Println("create post failed:", err)
-					return
-				}
+	viper.AutomaticEnv()
+	if err := viper.ReadInConfig(); err != nil {
+		log.Warnf("failed to read from env: %v", err)
+		viper.AddConfigPath("./configs")  //path for docker compose configs
+		viper.AddConfigPath("../configs") //path for local configs
+		viper.SetConfigName("config")
+		viper.SetConfigType("yaml")
+		if err = viper.ReadInConfig(); err != nil {
+			log.Warnf("failed to read from yaml: %v", err)
+			localErr := viper.ReadConfig(bytes.NewBuffer(configs.DefaultConfig))
+			if localErr != nil {
+				log.WithError(localErr).Error("read from default configs failed")
+				return nil, localErr
 			}
 		}
 	}
+
+	conf := new(Configs)
+	if err := viper.Unmarshal(conf); err != nil {
+		log.Errorf("faeiled unmarshal")
+		return nil, err
+	}
+
+	conf.adminsId = make([]int64, 0)
+	for _, s := range strings.Split(conf.Admins, ",") {
+		id, err := strconv.ParseInt(strings.TrimSpace(s), 10, 64)
+		if err != nil {
+			return nil, err
+		}
+		conf.adminsId = append(conf.adminsId, id)
+	}
+
+	return conf, nil
+}
+
+func prepareBot(ctx context.Context, log *log2.Logger, postRepo *repositories.PostRepository) (*bot.Bot, error) {
+	opts := []bot.Option{
+		bot.WithMiddlewares(addLang, checkAdmin),
+	}
+	b, err := bot.New(conf.BotToken, opts...)
+	if err != nil {
+		log.WithError(err).Error("failed to create new bot")
+		return nil, err
+	}
+	botHandlers, err := handlers.NewHandler(ctx, log, conf.Handlers, postRepo)
+	if err != nil {
+		log.WithError(err).Error("failed to create bot handlers")
+		return nil, err
+	}
+	botHandlers.RegisterHandlers(ctx, b)
+
+	return b, nil
 }
 
 func addLang(next bot.HandlerFunc) bot.HandlerFunc {
 	return func(ctx context.Context, b *bot.Bot, update *models.Update) {
 		next(context.WithValue(ctx, "lang", "fa"), b, update)
+	}
+}
+
+func checkAdmin(next bot.HandlerFunc) bot.HandlerFunc {
+	return func(ctx context.Context, b *bot.Bot, update *models.Update) {
+		if update.Message != nil {
+			for _, admin := range conf.adminsId {
+				if update.Message.Chat.ID == admin {
+					next(ctx, b, update)
+					return
+				}
+			}
+		}
 	}
 }
