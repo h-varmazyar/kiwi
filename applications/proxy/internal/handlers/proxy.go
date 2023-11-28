@@ -54,9 +54,8 @@ func (h *Handler) handleProxy(ctx context.Context, b *bot.Bot, update *models.Up
 			tgBotHelpers.SendError(ctx, b, params)
 		}
 		_, err = b.SendMessage(ctx, &bot.SendMessageParams{
-			ChatID:      h.configs.PublishChannelId,
-			Text:        responseProxyAdded,
-			ReplyMarkup: h.proxyKeyboard(b, proxyLinks),
+			ChatID: chatId,
+			Text:   responseProxyAdded,
 		})
 		if err != nil {
 			params := &tgBotHelpers.ErrParams{
