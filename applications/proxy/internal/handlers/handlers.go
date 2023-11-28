@@ -19,7 +19,7 @@ var (
 
 	isValidProxy = func(update *models.Update) bool {
 		msgWithProxy := strings.Contains(update.Message.Text, "https://t.me/proxy?server")
-		callbackWithProxy := update.InlineQuery != nil && strings.Contains(update.InlineQuery.Query, "https://t.me/proxy?server")
+		callbackWithProxy := update.Message != nil && update.Message.ReplyMarkup.InlineKeyboard != nil
 		return msgWithProxy || callbackWithProxy
 	}
 )

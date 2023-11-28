@@ -17,7 +17,7 @@ func respProxyCaption(proxyLinks []string) string {
 
 🔸🔹🔸🔹🔸🔹🔸🔹🔸🔹🔸🔹
 
-🌐 @kiwi_proxy
+🌐 @kiwi\_proxy
 `
 
 	proxyLinksText := ""
@@ -33,4 +33,5 @@ func respProxyCaption(proxyLinks []string) string {
 
 var (
 	responseContentSaved = "محتوا با موفقیت افزوده شد"
+	responseProxyAdded   = "پروکسی با موفقیت افزوده شد"
 )

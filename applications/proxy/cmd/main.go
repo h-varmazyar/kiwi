@@ -3,6 +3,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 	"github.com/h-varmazyar/kiwi/applications/proxy/configs"
@@ -88,6 +89,7 @@ func prepareConfigs(_ context.Context, log *log2.Logger) (*Configs, error) {
 
 func prepareBot(ctx context.Context, log *log2.Logger, postRepo *repositories.PostRepository) (*bot.Bot, error) {
 	opts := []bot.Option{
+		bot.WithDefaultHandler(defaultHandler),
 		bot.WithMiddlewares(addLang, checkAdmin),
 	}
 	b, err := bot.New(conf.BotToken, opts...)
@@ -122,4 +124,11 @@ func checkAdmin(next bot.HandlerFunc) bot.HandlerFunc {
 			}
 		}
 	}
+}
+
+func defaultHandler(ctx context.Context, b *bot.Bot, update *models.Update) {
+	fmt.Println("msg:", update.Message)
+	fmt.Println("rpl:", update.Message.ReplyMarkup)
+	fmt.Println("inq:", update.InlineQuery)
+	fmt.Println("cap:", update.Message.CaptionEntities)
 }

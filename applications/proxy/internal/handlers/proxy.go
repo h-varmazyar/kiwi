@@ -5,6 +5,7 @@ import (
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 	"github.com/h-varmazyar/kiwi/pkg/tgBotHelpers"
+	"strings"
 )
 
 func (h *Handler) handleProxy(ctx context.Context, b *bot.Bot, update *models.Update) {
@@ -17,7 +18,9 @@ func (h *Handler) handleProxy(ctx context.Context, b *bot.Bot, update *models.Up
 	if k := update.Message.ReplyMarkup.InlineKeyboard; k != nil {
 		for _, row := range k {
 			for _, button := range row {
-				proxyLinks = append(proxyLinks, button.URL)
+				if strings.Contains(button.URL, "https://t.me/proxy?server") {
+					proxyLinks = append(proxyLinks, button.URL)
+				}
 			}
 		}
 	}
@@ -47,6 +50,19 @@ func (h *Handler) handleProxy(ctx context.Context, b *bot.Bot, update *models.Up
 			params := &tgBotHelpers.ErrParams{
 				ChatId: chatId,
 				Err:    err,
+			}
+			tgBotHelpers.SendError(ctx, b, params)
+		}
+		_, err = b.SendMessage(ctx, &bot.SendMessageParams{
+			ChatID:      h.configs.PublishChannelId,
+			Text:        responseProxyAdded,
+			ReplyMarkup: h.proxyKeyboard(b, proxyLinks),
+		})
+		if err != nil {
+			params := &tgBotHelpers.ErrParams{
+				ChatId:   chatId,
+				Err:      err,
+				IsSilent: true,
 			}
 			tgBotHelpers.SendError(ctx, b, params)
 		}
