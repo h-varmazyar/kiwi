@@ -32,8 +32,8 @@ type Media struct {
 	TelegramFileId string       `gorm:"varchar(100)"`
 	Quality        MediaQuality `gorm:"varchar(50)"`
 	Type           MediaType    `gorm:"varchar(50)"`
+	OwnerType      string       `gorm:"not null"`
 	OwnerID        uint
-	OwnerType      string
 }
 
 func (e *Media) Json() string {

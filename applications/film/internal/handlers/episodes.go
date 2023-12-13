@@ -6,7 +6,7 @@ import (
 	"github.com/go-telegram/bot"
 	"github.com/go-telegram/bot/models"
 	"github.com/h-varmazyar/kiwi/applications/film/internal/repositories"
-	entities2 "github.com/h-varmazyar/kiwi/applications/film/pkg/entities"
+	"github.com/h-varmazyar/kiwi/applications/film/pkg/entities"
 	"strconv"
 	"strings"
 )
@@ -15,7 +15,6 @@ const (
 	hardSubtitleLabel = "زیر نویس چسبیده دارد"
 )
 
-// showEpisodes done
 func (h *Handler) showEpisodes(ctx context.Context, b *bot.Bot, update *models.Message, data []byte) {
 	chatId := update.Chat.ID
 	seasonId, err := strconv.Atoi(string(data))
@@ -57,7 +56,6 @@ func (h *Handler) showEpisodes(ctx context.Context, b *bot.Bot, update *models.M
 	})
 }
 
-// showEpisode done
 func (h *Handler) showEpisode(ctx context.Context, b *bot.Bot, update *models.Message, data []byte) {
 	chatId := update.Chat.ID
 	episodeId, err := strconv.Atoi(string(data))
@@ -111,7 +109,7 @@ func (h *Handler) addEpisode(ctx context.Context, b *bot.Bot, update *models.Mes
 		return
 	}
 
-	episode := &entities2.Episode{SeasonId: uint(seasonId)}
+	episode := &entities.Episode{SeasonId: uint(seasonId)}
 	if err := h.addContentRepo.SetEpisode(ctx, update.Chat.ID, episode); err != nil {
 		SendError(ctx, b, &ErrParams{
 			ChatId: update.Chat.ID,
@@ -205,8 +203,6 @@ func (h *Handler) stateAddEpisodeBanner(ctx context.Context, b *bot.Bot, update 
 		return
 	}
 
-	fmt.Println("banner found")
-
 	episode, err := h.addContentRepo.GetEpisode(ctx, chatId)
 	if err != nil {
 		SendError(ctx, b, &ErrParams{
@@ -217,13 +213,11 @@ func (h *Handler) stateAddEpisodeBanner(ctx context.Context, b *bot.Bot, update 
 		return
 	}
 
-	fmt.Println("episode get")
-	episode.Banner = &entities2.Media{
+	episode.Banner = &entities.Media{
 		TelegramFileId: update.Message.Photo[0].FileID,
-		Type:           entities2.MediaTypePicture,
+		Type:           entities.MediaTypePicture,
 	}
 
-	fmt.Println("ep media set")
 	if err = h.addContentRepo.SetEpisode(ctx, chatId, episode); err != nil {
 		SendError(ctx, b, &ErrParams{
 			ChatId:   chatId,
@@ -233,8 +227,6 @@ func (h *Handler) stateAddEpisodeBanner(ctx context.Context, b *bot.Bot, update 
 		return
 	}
 
-	fmt.Println("episode save")
-
 	if err = h.userStateRepo.DeleteState(ctx, chatId); err != nil {
 		SendError(ctx, b, &ErrParams{
 			ChatId: chatId,
@@ -243,22 +235,17 @@ func (h *Handler) stateAddEpisodeBanner(ctx context.Context, b *bot.Bot, update 
 		return
 	}
 
-	fmt.Println("ep state del done")
-
 	photo := &models.InputFileString{
 		Data: episode.Banner.TelegramFileId,
 	}
 
-	fmt.Println(prepareEpisodeCaptionAllQuality(episode))
-	_, err = b.SendPhoto(ctx, &bot.SendPhotoParams{
+	_, _ = b.SendPhoto(ctx, &bot.SendPhotoParams{
 		ChatID:      update.Message.Chat.ID,
 		Caption:     prepareEpisodeCaptionAllQuality(episode),
 		Photo:       photo,
 		ParseMode:   models.ParseModeMarkdown,
 		ReplyMarkup: h.keyboardEpisodeSubmit(ctx, b, episode.ID),
 	})
-
-	fmt.Println(err)
 }
 
 func (h *Handler) submitEpisodeAddition(ctx context.Context, b *bot.Bot, update *models.Message, data []byte) {
@@ -290,14 +277,6 @@ func (h *Handler) submitEpisodeAddition(ctx context.Context, b *bot.Bot, update 
 		return
 	}
 
-	if err = h.userStateRepo.DeleteState(ctx, chatId); err != nil {
-		SendError(ctx, b, &ErrParams{
-			ChatId: chatId,
-			Err:    err,
-		})
-		return
-	}
-
 	photo := &models.InputFileString{
 		Data: episode.Banner.TelegramFileId,
 	}
@@ -310,8 +289,24 @@ func (h *Handler) submitEpisodeAddition(ctx context.Context, b *bot.Bot, update 
 	})
 }
 
+func (h *Handler) cancelEpisodeAddition(ctx context.Context, b *bot.Bot, update *models.Message, data []byte) {
+	if err := h.addContentRepo.DeleteEpisode(ctx, update.Chat.ID); err != nil {
+		SendError(ctx, b, &ErrParams{
+			ChatId:   update.Chat.ID,
+			Err:      err,
+			Metadata: update,
+		})
+		return
+	}
+
+	SendSuccess(ctx, b, &SuccessParams{
+		ChatId:   update.Chat.ID,
+		IsSilent: false,
+	})
+}
+
 func (h *Handler) addEpisodeVideo(ctx context.Context, b *bot.Bot, update *models.Message, data []byte) {
-	if err := h.userStateRepo.SetState(ctx, update.Chat.ID, repositories.StateAddEpisodeVideo); err != nil {
+	if err := h.userStateRepo.SetState(ctx, update.Chat.ID, repositories.StateAddMedia); err != nil {
 		SendError(ctx, b, &ErrParams{
 			ChatId:   update.Chat.ID,
 			Err:      err,
@@ -334,8 +329,8 @@ func (h *Handler) addEpisodeVideo(ctx context.Context, b *bot.Bot, update *model
 
 	fmt.Println("episode id:", episodeId)
 
-	media := &entities2.Media{
-		Type:      entities2.MediaTypeVideo,
+	media := &entities.Media{
+		Type:      entities.MediaTypeVideo,
 		OwnerID:   uint(episodeId),
 		OwnerType: "episode",
 	}
@@ -353,7 +348,7 @@ func (h *Handler) addEpisodeVideo(ctx context.Context, b *bot.Bot, update *model
 
 	_, err = b.SendMessage(ctx, &bot.SendMessageParams{
 		ChatID:      update.Chat.ID,
-		Text:        MsgAddEpisodeVideo,
+		Text:        MsgAddQuality,
 		ReplyMarkup: h.keyboardCancel(b),
 	})
 	fmt.Println(err)
@@ -428,7 +423,7 @@ func (h *Handler) sendEpisodeToPrivateChannel(ctx context.Context, b *bot.Bot, u
 
 }
 
-func prepareEpisodeCaptionAllQuality(episode *entities2.Episode) string {
+func prepareEpisodeCaptionAllQuality(episode *entities.Episode) string {
 	text := fmt.Sprintf("📹 %v\n", episode.Title)
 	text = fmt.Sprintf("%v📝 %v\n", text, episode.Presentation)
 
@@ -460,7 +455,7 @@ func prepareEpisodeCaptionAllQuality(episode *entities2.Episode) string {
 
 	downloads := ""
 	for _, video := range episode.Videos {
-		botLink := fmt.Sprintf("https://t.me/Kiwifilm_bot?start=ep%v", video.ID)
+		botLink := fmt.Sprintf("https://t.me/Kiwifilm_bot?start=%v", video.ID)
 		downloads = fmt.Sprintf("%v⬇️ کیفیت %v: [دانلود](%v) \\- [مشاهده](%v)\n", downloads, video.Quality, video.DownloadUrl, botLink)
 	}
 
@@ -471,7 +466,7 @@ func prepareEpisodeCaptionAllQuality(episode *entities2.Episode) string {
 	return text
 }
 
-func prepareEpisodeCaptionForWatch(episode *entities2.Episode, quality entities2.MediaQuality) string {
+func prepareEpisodeCaptionForWatch(episode *entities.Episode, quality entities.MediaQuality) string {
 	text := fmt.Sprintf("📹 %v\n", episode.Title)
 	text = fmt.Sprintf("%v📝 %v\n", text, episode.Presentation)
 
@@ -548,7 +543,7 @@ func (h *Handler) sendEpisodeToPublicChannel(ctx context.Context, b *bot.Bot, up
 	} else {
 		_, _ = b.SendMessage(ctx, &bot.SendMessageParams{
 			ChatID: update.Chat.ID,
-			Text:   "کانال عمومی یافت نشد ندارد",
+			Text:   "کانال عمومی یافت نشد",
 		})
 	}
 }

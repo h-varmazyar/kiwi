@@ -4,7 +4,7 @@ import (
 	"context"
 	e "errors"
 	db2 "github.com/h-varmazyar/kiwi/applications/film/pkg/db/PostgreSQL"
-	entities2 "github.com/h-varmazyar/kiwi/applications/film/pkg/entities"
+	"github.com/h-varmazyar/kiwi/applications/film/pkg/entities"
 	"github.com/h-varmazyar/kiwi/pkg/errors"
 	log "github.com/sirupsen/logrus"
 	"gorm.io/gorm"
@@ -50,11 +50,11 @@ func (r *SeriesRepository) migration(_ context.Context, dbInstance *db2.DB) erro
 	newMigrations := make([]*db2.Migration, 0)
 	err = dbInstance.PostgresDB.Transaction(func(tx *gorm.DB) error {
 		if _, ok := migrations["v1.0.0"]; !ok {
-			err = tx.AutoMigrate(new(entities2.Movie))
+			err = tx.AutoMigrate(new(entities.Movie))
 			if err != nil {
 				return err
 			}
-			err = tx.AutoMigrate(new(entities2.Series))
+			err = tx.AutoMigrate(new(entities.Series))
 			if err != nil {
 				return err
 			}
@@ -65,14 +65,16 @@ func (r *SeriesRepository) migration(_ context.Context, dbInstance *db2.DB) erro
 			})
 		}
 		if _, ok := migrations["v1.0.1"]; !ok {
-			err = tx.Migrator().AddColumn(&entities2.Series{}, "PrivateChannelId")
-			newMigrations = append(newMigrations, &db2.Migration{
-				TableName:   seriesTableName,
-				Tag:         "v1.0.1",
-				Description: "add private channel id",
-			})
-			if err != nil {
-				return err
+			if !tx.Migrator().HasColumn(&entities.Series{}, "PrivateChannelId") {
+				err = tx.Migrator().AddColumn(&entities.Series{}, "PrivateChannelId")
+				newMigrations = append(newMigrations, &db2.Migration{
+					TableName:   seriesTableName,
+					Tag:         "v1.0.1",
+					Description: "add private channel id",
+				})
+				if err != nil {
+					return err
+				}
 			}
 		}
 		err = tx.Model(new(db2.Migration)).CreateInBatches(&newMigrations, 100).Error
@@ -88,7 +90,7 @@ func (r *SeriesRepository) migration(_ context.Context, dbInstance *db2.DB) erro
 	return nil
 }
 
-func (r *SeriesRepository) Create(_ context.Context, series *entities2.Series) error {
+func (r *SeriesRepository) Create(_ context.Context, series *entities.Series) error {
 	if err := r.PostgresDB.Transaction(func(tx *gorm.DB) error {
 		//if err := tx.Model(new(entities.Media)).Save(series.Banner).Error; err != nil {
 		//	return err
@@ -108,21 +110,21 @@ func (r *SeriesRepository) Create(_ context.Context, series *entities2.Series) e
 	return nil
 }
 
-func (r *SeriesRepository) Search(_ context.Context, searchQuery string) ([]*entities2.Series, error) {
-	series := make([]*entities2.Series, 0)
-	if err := r.PostgresDB.Model(new(entities2.Series)).Find(&series).Limit(5).Error; err != nil {
+func (r *SeriesRepository) Search(_ context.Context, searchQuery string) ([]*entities.Series, error) {
+	series := make([]*entities.Series, 0)
+	if err := r.PostgresDB.Model(new(entities.Movie)).
+		Where("title like %?%", searchQuery).
+		Or("fa_name like %?%", searchQuery).
+		Or("en_name like %?%", searchQuery).
+		Find(&series).Limit(5).Error; err != nil {
 		return nil, err
 	}
-	if len(series) == 0 {
-		return nil, ErrNoSeriesFound
-	}
-
 	return series, nil
 }
 
-func (r *SeriesRepository) Return(_ context.Context, id uint) (*entities2.Series, error) {
-	series := new(entities2.Series)
-	if err := r.PostgresDB.Model(new(entities2.Series)).Preload("Banner").Preload("Genres").Where("id = ?", id).First(series).Error; err != nil {
+func (r *SeriesRepository) Return(_ context.Context, id uint) (*entities.Series, error) {
+	series := new(entities.Series)
+	if err := r.PostgresDB.Model(new(entities.Series)).Preload("Banner").Preload("Genres").Where("id = ?", id).First(series).Error; err != nil {
 		if e.Is(err, gorm.ErrRecordNotFound) {
 			return nil, ErrNoSeriesFound
 		}

@@ -63,16 +63,19 @@ func (r *EpisodeRepository) migration(_ context.Context, dbInstance *db2.DB) err
 			})
 		}
 		if _, ok := migrations["v1.0.1"]; !ok {
-			err = tx.Migrator().AddColumn(&entities.Episode{}, "VisitCount")
-			if err != nil {
-				return err
+			if !tx.Migrator().HasColumn(&entities.Episode{}, "VisitCount") {
+				err = tx.Migrator().AddColumn(&entities.Episode{}, "VisitCount")
+				if err != nil {
+					return err
+				}
+				newMigrations = append(newMigrations, &db2.Migration{
+					TableName:   episodeTable,
+					Tag:         "v1.0.1",
+					Description: "add visit_count column",
+				})
 			}
-			newMigrations = append(newMigrations, &db2.Migration{
-				TableName:   episodeTable,
-				Tag:         "v1.0.1",
-				Description: "add visit_count column",
-			})
 		}
+
 		err = tx.Model(new(db2.Migration)).CreateInBatches(&newMigrations, 100).Error
 		if err != nil {
 			return err

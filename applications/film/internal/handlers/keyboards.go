@@ -8,19 +8,36 @@ import (
 	entities2 "github.com/h-varmazyar/kiwi/applications/film/pkg/entities"
 )
 
+func (h *Handler) keyboardAdd(b *bot.Bot) *inline.Keyboard {
+	return inline.New(b).
+		Row().
+		Button("سریال", []byte("سریال"), h.addEpisode).
+		//Button("سریال", []byte("سریال"), h.addSeries).
+		Button("قسمت سریال", []byte("قسمت سریال"), h.addEpisode).
+		Row().
+		Button("سینمایی", []byte("سینمایی"), h.addMovie).
+		Button("افزودن کیفیت", []byte("افزودن کیفیت"), h.addEpisode).
+		//Button("افزودن کیفیت", []byte("افزودن کیفیت"), h.addQuality).
+		Row().
+		Button("لغو", []byte{}, h.cancelAddition)
+}
+
 func (h *Handler) keyboardCancel(b *bot.Bot) *inline.Keyboard {
 	return inline.New(b).
 		Row().
 		Button("لغو", []byte{}, h.cancelAddition)
 }
 
-func (h *Handler) keyboardSearchedSeries(_ context.Context, b *bot.Bot, seriesList []*entities2.Series) *inline.Keyboard {
+func (h *Handler) keyboardSearchedSeries(_ context.Context, b *bot.Bot, searchResults []*SearchResult) *inline.Keyboard {
 	keyboard := inline.New(b)
 
-	for _, series := range seriesList {
-		keyboard.
-			Row().
-			Button(fmt.Sprintf("%v | %v", series.FaName, series.EnName), []byte(fmt.Sprintf("%v", series.ID)), h.selectSeries)
+	for _, result := range searchResults {
+		row := keyboard.Row()
+		if result.Type == SearchResultMovie {
+			row.Button(fmt.Sprintf("%v | %v", result.FaName, result.EnName), []byte(fmt.Sprintf("%v", result.Id)), h.selectMovie)
+		} else {
+			row.Button(fmt.Sprintf("%v | %v", result.FaName, result.EnName), []byte(fmt.Sprintf("%v", result.Id)), h.selectSeries)
+		}
 	}
 
 	keyboard.Row().Button("لغو", []byte(""), h.cancelAddition)
@@ -33,6 +50,18 @@ func (h *Handler) keyboardSeriesInfo(_ context.Context, b *bot.Bot, seriesId uin
 		Row().
 		Button("فصل‌ها", []byte(fmt.Sprintf("%v", seriesId)), h.showSeasons).
 		Button("افزودن فصل جدید", []byte(fmt.Sprintf("%v", seriesId)), h.addSeason)
+
+	return keyboard
+}
+
+func (h *Handler) keyboardMovieInfo(_ context.Context, b *bot.Bot, isAdmin bool, movieId uint) *inline.Keyboard {
+	keyboard := inline.New(b)
+	if isAdmin {
+		keyboard.Row().
+			Button("افزودن کیفیت جدید", []byte(fmt.Sprintf("%v", movieId)), h.addMovieVideo).
+			Button("ارسال در کانال اصلی", []byte(fmt.Sprintf("%v", movieId)), h.sendMovieToPublicChannel)
+	}
+	keyboard.Row().Button("مشاهده", []byte(fmt.Sprintf("%v", movieId)), h.showMovie)
 
 	return keyboard
 }
@@ -52,7 +81,16 @@ func (h *Handler) keyboardEpisodeSubmit(_ context.Context, b *bot.Bot, episodeId
 	keyboard := inline.New(b).
 		Row().
 		Button("تایید", []byte(fmt.Sprintf("%v", episodeId)), h.submitEpisodeAddition).
-		Button("لغو", []byte(fmt.Sprintf("%v", episodeId)), h.cancelAddition)
+		Button("لغو", []byte(fmt.Sprintf("%v", episodeId)), h.cancelEpisodeAddition)
+
+	return keyboard
+}
+
+func (h *Handler) keyboardMovieSubmit(_ context.Context, b *bot.Bot, movieId uint) *inline.Keyboard {
+	keyboard := inline.New(b).
+		Row().
+		Button("تایید", []byte(fmt.Sprintf("%v", movieId)), h.submitMovieAddition).
+		Button("لغو", []byte(fmt.Sprintf("%v", movieId)), h.cancelMovieAddition)
 
 	return keyboard
 }
@@ -61,6 +99,14 @@ func (h *Handler) keyboardAddEpisodeVideo(_ context.Context, b *bot.Bot, episode
 	keyboard := inline.New(b).
 		Row().
 		Button("افزودن کیفیت جدید", []byte(fmt.Sprintf("%v", episodeId)), h.addEpisodeVideo)
+
+	return keyboard
+}
+
+func (h *Handler) keyboardAddMovieVideo(_ context.Context, b *bot.Bot, movieId uint) *inline.Keyboard {
+	keyboard := inline.New(b).
+		Row().
+		Button("افزودن کیفیت جدید", []byte(fmt.Sprintf("%v", movieId)), h.addMovieVideo)
 
 	return keyboard
 }
@@ -107,6 +153,13 @@ func (h *Handler) keyboardMediaQualities(_ context.Context, b *bot.Bot) *inline.
 		Button(fmt.Sprintf("%v", entities2.Quality480WebDL), []byte(fmt.Sprintf("%v", entities2.Quality480WebDL)), h.setQuality).
 		Button(fmt.Sprintf("%v", entities2.Quality720WebDL), []byte(fmt.Sprintf("%v", entities2.Quality720WebDL)), h.setQuality).
 		Button(fmt.Sprintf("%v", entities2.Quality1080WebDL), []byte(fmt.Sprintf("%v", entities2.Quality1080WebDL)), h.setQuality)
+
+	return keyboard
+}
+
+func (h *Handler) keyboardContinueQuality(_ context.Context, b *bot.Bot) *inline.Keyboard {
+	keyboard := inline.New(b).Row().
+		Button("اتمام", []byte(fmt.Sprintf("%v", entities2.Quality480HQ)), h.completeAddQualities)
 
 	return keyboard
 }

@@ -9,7 +9,9 @@ import (
 type Configs struct {
 	Version  string           `yaml:"version"`
 	BotToken string           `yaml:"botToken"`
+	Admins   string           `yaml:"admins"`
 	DB       gormext.Configs  `yaml:"db"`
 	Redis    redisPkg.Configs `yaml:"redis"`
 	Handlers handlers.Configs `yaml:"handlers"`
+	admins   []int64          `yaml:"-"`
 }

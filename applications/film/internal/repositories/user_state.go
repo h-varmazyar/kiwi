@@ -9,10 +9,11 @@ type State string
 
 const (
 	StateAddSeries        = "add_series"
+	StateAddMovie         = "add_movie"
+	StateAddMovieBanner   = "add_movie_banner"
 	StateAddEpisode       = "add_episode"
 	StateAddEpisodeBanner = "add_episode_banner"
-	StateAddEpisodeVideo  = "add_episode_video"
-	StateAddBanner        = "add_banner"
+	StateAddMedia         = "add_media"
 )
 
 type UserStateRepository struct {

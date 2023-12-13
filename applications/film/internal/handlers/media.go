@@ -8,6 +8,11 @@ import (
 )
 
 func (h *Handler) stateAddMedia(ctx context.Context, b *bot.Bot, update *models.Update) {
+	if update.Message == nil {
+
+		return
+	}
+
 	media, err := h.addContentRepo.GetMedia(ctx, update.Message.Chat.ID)
 	if err != nil {
 		SendError(ctx, b, &ErrParams{
@@ -77,7 +82,32 @@ func (h *Handler) setQuality(ctx context.Context, b *bot.Bot, update *models.Mes
 	}
 
 	_, _ = b.SendMessage(ctx, &bot.SendMessageParams{
-		ChatID: update.Chat.ID,
-		Text:   "ویدئو با موفقیت افزوده شد",
+		ChatID:      update.Chat.ID,
+		Text:        MsgSetOtherVideoQuality,
+		ReplyMarkup: h.keyboardContinueQuality(ctx, b),
+	})
+}
+
+func (h *Handler) completeAddQualities(ctx context.Context, b *bot.Bot, update *models.Message, data []byte) {
+	if err := h.userStateRepo.DeleteState(ctx, update.Chat.ID); err != nil {
+		SendError(ctx, b, &ErrParams{
+			ChatId:   update.Chat.ID,
+			Err:      err,
+			Metadata: update,
+		})
+		return
+	}
+	if err := h.addContentRepo.DeleteMedia(ctx, update.Chat.ID); err != nil {
+		SendError(ctx, b, &ErrParams{
+			ChatId:   update.Chat.ID,
+			Err:      err,
+			Metadata: update,
+		})
+		return
+	}
+
+	SendSuccess(ctx, b, &SuccessParams{
+		ChatId:   update.Chat.ID,
+		IsSilent: false,
 	})
 }

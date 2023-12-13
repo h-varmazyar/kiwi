@@ -72,3 +72,9 @@ func SendSuccess(ctx context.Context, b *bot.Bot, params *SuccessParams) {
 		})
 	}
 }
+
+func (h *Handler) isAdmin(userId int64) bool {
+	_, ok := h.configs.Admins[userId]
+
+	return ok
+}

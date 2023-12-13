@@ -11,7 +11,7 @@ import (
 )
 
 var (
-	ErrNoMediaFound = errors.NewWithCode("no_media_found", 2001)
+	ErrNoMediaFound = errors.NewWithCode("no_media_found", 2301)
 )
 
 var mediaTableName = "media"
@@ -84,7 +84,7 @@ func (r *MediaRepository) Return(_ context.Context, id uint) (*entities.Media, e
 	media := new(entities.Media)
 	if err := r.PostgresDB.Model(new(entities.Media)).Where("id = ?", id).First(media).Error; err != nil {
 		if e.Is(err, gorm.ErrRecordNotFound) {
-			return nil, ErrNoSeriesFound
+			return nil, ErrNoMediaFound
 		}
 		return nil, err
 	}
