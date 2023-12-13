@@ -51,7 +51,7 @@ func prepareConfigs(_ context.Context, log *log2.Logger) (*Configs, error) {
 		log.Warnf("failed to read from env: %v", err)
 		viper.AddConfigPath("./configs")  //path for docker compose configs
 		viper.AddConfigPath("../configs") //path for local configs
-		viper.SetConfigName("configs")
+		viper.SetConfigName("config")
 		viper.SetConfigType("yaml")
 		if err = viper.ReadInConfig(); err != nil {
 			log.Warnf("failed to read from yaml: %v", err)
