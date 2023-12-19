@@ -331,7 +331,7 @@ func prepareMovieCaptionAllQuality(movie *entities.Movie) string {
 	for _, video := range movie.Videos {
 		download := fmt.Sprintf("⬇️ کیفیت %v: ", video.Quality)
 		if video.DownloadUrl != "" {
-			download += fmt.Sprintf("- [دانلود](%v)", video.DownloadUrl)
+			download += fmt.Sprintf("-\\ [دانلود](%v)", video.DownloadUrl)
 		}
 		botLink := fmt.Sprintf("https://t.me/Kiwifilm_bot?start=%v", video.ID)
 		download += fmt.Sprintf(" [مشاهده](%v)\n", botLink)
