@@ -25,7 +25,7 @@ services:
     environment:
       - ALLOW_EMPTY_PASSWORD=no
     volumes:
-      - redis_kiwi_data:/var/lib/redis
+      - redis_kiwi_data:/data
     networks:
       - kiwi
     ports:
