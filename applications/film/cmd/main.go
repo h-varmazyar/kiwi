@@ -8,12 +8,15 @@ import (
 	"github.com/h-varmazyar/kiwi/applications/film/configs"
 	"github.com/h-varmazyar/kiwi/applications/film/internal/handlers"
 	db2 "github.com/h-varmazyar/kiwi/applications/film/pkg/db/PostgreSQL"
+	"github.com/h-varmazyar/kiwi/applications/film/pkg/imdb"
 	log2 "github.com/sirupsen/logrus"
 	"github.com/spf13/viper"
+	"net/http"
 	"os"
 	"os/signal"
 	"strconv"
 	"strings"
+	"time"
 )
 
 var (
@@ -65,7 +68,7 @@ func prepareConfigs(_ context.Context, log *log2.Logger) (*Configs, error) {
 
 	conf := new(Configs)
 	if err := viper.Unmarshal(conf); err != nil {
-		log.Errorf("faeiled unmarshal")
+		log.Errorf("failed unmarshal")
 		return nil, err
 	}
 
@@ -90,13 +93,20 @@ func prepareConfigs(_ context.Context, log *log2.Logger) (*Configs, error) {
 func prepareBot(ctx context.Context, log *log2.Logger, db *db2.DB) (*bot.Bot, error) {
 	opts := []bot.Option{
 		bot.WithMiddlewares(addLang),
+		bot.WithCheckInitTimeout(time.Minute),
+		bot.WithHTTPClient(time.Second*30, &http.Client{}),
+		bot.WithDebug(),
+		bot.WithSkipGetMe(),
 	}
 	b, err := bot.New(conf.BotToken, opts...)
 	if err != nil {
 		log.WithError(err).Error("failed to create new bot")
 		return nil, err
 	}
-	botHandlers, err := handlers.NewHandler(ctx, log, conf.Handlers, db)
+
+	imdbClient := imdb.NewIMDB(ctx, conf.IMDB)
+
+	botHandlers, err := handlers.NewHandler(ctx, log, conf.Handlers, db, imdbClient)
 	if err != nil {
 		log.WithError(err).Error("failed to create bot handlers")
 		return nil, err

@@ -8,6 +8,7 @@ import (
 	repositories "github.com/h-varmazyar/kiwi/applications/film/internal/repositories"
 	"github.com/h-varmazyar/kiwi/applications/film/pkg/db/PostgreSQL"
 	redisPkg "github.com/h-varmazyar/kiwi/applications/film/pkg/db/redis"
+	"github.com/h-varmazyar/kiwi/applications/film/pkg/imdb"
 	log "github.com/sirupsen/logrus"
 	"regexp"
 	"strings"
@@ -28,6 +29,7 @@ type Configs struct {
 type Handler struct {
 	configs             Configs
 	log                 *log.Logger
+	imdbClient          *imdb.IMDB
 	userStateRepository *repositories.UserStateRepository
 	addContentRepo      *repositories.AddContentRepository
 	mediaRepo           *repositories.MediaRepository
@@ -38,7 +40,7 @@ type Handler struct {
 	userStateRepo       *repositories.UserStateRepository
 }
 
-func NewHandler(ctx context.Context, log *log.Logger, configs Configs, db *db.DB) (*Handler, error) {
+func NewHandler(ctx context.Context, log *log.Logger, configs Configs, db *db.DB, imdbClient *imdb.IMDB) (*Handler, error) {
 	configs.RedisConfigs.DB = configs.RedisDB
 	redisClient := redisPkg.NewClient(configs.RedisConfigs)
 
@@ -69,6 +71,7 @@ func NewHandler(ctx context.Context, log *log.Logger, configs Configs, db *db.DB
 	return &Handler{
 		configs:             configs,
 		log:                 log,
+		imdbClient:          imdbClient,
 		userStateRepository: userStateRepo,
 		addContentRepo:      addContentRepo,
 		mediaRepo:           mediaRepo,

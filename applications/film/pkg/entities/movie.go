@@ -25,7 +25,7 @@ type Movie struct {
 	Tags         pq.StringArray `gorm:"type:text[]"`
 	Genres       []*Genre       `gorm:"many2many:series_genres;"`
 	Videos       []*Media       `gorm:"polymorphic:Owner;polymorphicValue:movie"`
-	IMDBLink     string         `gorm:"varchar(200)"`
+	ImdbId       string         `gorm:"varchar(50)"`
 	IMDB         float32
 }
 

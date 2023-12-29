@@ -35,6 +35,7 @@ func NewMoviesRepository(ctx context.Context, log *log.Logger, db *db.DB) (*Movi
 }
 
 func (r *MoviesRepository) migration(_ context.Context, dbInstance *db.DB) error {
+	r.log.Infof("running migrations")
 	var err error
 	migrations := make(map[string]struct{})
 	tags := make([]string, 0)
@@ -50,6 +51,7 @@ func (r *MoviesRepository) migration(_ context.Context, dbInstance *db.DB) error
 	newMigrations := make([]*db.Migration, 0)
 	err = dbInstance.PostgresDB.Transaction(func(tx *gorm.DB) error {
 		if _, ok := migrations["v1.0.0"]; !ok {
+			r.log.Infof("migrating version v1.0.0")
 			err = tx.AutoMigrate(new(entities.Movie))
 			if err != nil {
 				return err
@@ -59,6 +61,21 @@ func (r *MoviesRepository) migration(_ context.Context, dbInstance *db.DB) error
 				Tag:         "v1.0.0",
 				Description: "create movies table",
 			})
+			r.log.Infof("version v1.0.0 migrated")
+		}
+		if _, ok := migrations["v1.0.1"]; !ok {
+			r.log.Infof("migrating version v1.0.1")
+			err = tx.Migrator().DropColumn(&entities.Movie{}, "imdb_link")
+			if err != nil {
+				return err
+			}
+			err = tx.Migrator().AddColumn(&entities.Movie{}, "imdb_id")
+			newMigrations = append(newMigrations, &db.Migration{
+				TableName:   moviesTableName,
+				Tag:         "v1.0.1",
+				Description: "change imdb parameters",
+			})
+			r.log.Infof("version v1.0.1 migrated")
 		}
 		err = tx.Model(new(db.Migration)).CreateInBatches(&newMigrations, 100).Error
 		if err != nil {

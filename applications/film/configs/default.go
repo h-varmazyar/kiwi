@@ -15,8 +15,9 @@ db:
   name: "film"
   is_ssl_enable: false
 handlers:
-  admins: "3333333,2222222,1111111"
   redisDB: 1
   publicChannelId:
   promote_channels: "-1000,-2000"
+imdb:
+  baseUrl: "https://api.graphql.imdb.com"
 `)

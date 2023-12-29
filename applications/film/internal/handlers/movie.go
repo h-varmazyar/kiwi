@@ -8,6 +8,7 @@ import (
 	"github.com/h-varmazyar/kiwi/applications/film/internal/repositories"
 	"github.com/h-varmazyar/kiwi/applications/film/pkg/entities"
 	"github.com/h-varmazyar/kiwi/applications/film/pkg/helpers"
+	"regexp"
 	"strconv"
 	"strings"
 )
@@ -78,7 +79,10 @@ func (h *Handler) stateAddMovie(ctx context.Context, b *bot.Bot, update *models.
 	}
 	movie.Year = year
 
-	movie.IMDBLink = strings.TrimSpace(data[5])
+	movie.ImdbId = strings.TrimSpace(data[5])
+	if valid, _ := regexp.Match("[a-z]{2}[0-9]+", []byte(movie.ImdbId)); !valid {
+		movie.ImdbId = ""
+	}
 
 	langs := make([]string, 0)
 	for _, lang := range strings.Split(strings.TrimSpace(data[6]), " ") {
@@ -177,7 +181,7 @@ func (h *Handler) stateAddMovieBanner(ctx context.Context, b *bot.Bot, update *m
 
 	_, err = b.SendPhoto(ctx, &bot.SendPhotoParams{
 		ChatID:      chatId,
-		Caption:     prepareMovieCaptionAllQuality(movie),
+		Caption:     h.prepareMovieCaptionAllQuality(ctx, movie),
 		Photo:       photo,
 		ParseMode:   models.ParseModeMarkdown,
 		ReplyMarkup: h.keyboardMovieSubmit(ctx, b, movie.ID),
@@ -226,7 +230,7 @@ func (h *Handler) submitMovieAddition(ctx context.Context, b *bot.Bot, update *m
 	}
 	_, _ = b.SendPhoto(ctx, &bot.SendPhotoParams{
 		ChatID:      update.Chat.ID,
-		Caption:     prepareMovieCaptionAllQuality(movie),
+		Caption:     h.prepareMovieCaptionAllQuality(ctx, movie),
 		Photo:       photo,
 		ParseMode:   models.ParseModeMarkdown,
 		ReplyMarkup: h.keyboardAddMovieVideo(ctx, b, movie.ID),
@@ -291,55 +295,75 @@ func (h *Handler) addMovieVideo(ctx context.Context, b *bot.Bot, update *models.
 	})
 }
 
-func prepareMovieCaptionAllQuality(movie *entities.Movie) string {
-	text := helpers.EscapeText(fmt.Sprintf("📹 %v\n", movie.Title))
-	text += helpers.EscapeText(fmt.Sprintf("🇮🇷 %v\n", movie.FaName))
-	text += helpers.EscapeText(fmt.Sprintf("🏴󠁧󠁢󠁥󠁮󠁧󠁿 %v\n", movie.EnName))
-	text += helpers.EscapeText(fmt.Sprintf("📝 %v\n", movie.Presentation))
-	text += helpers.EscapeText(fmt.Sprintf("📽 %v\n", movie.Year))
-
-	languages := ""
-	for _, language := range movie.Languages {
-		languages = fmt.Sprintf("%v - %v", languages, language)
-	}
-	languages = strings.Trim(strings.TrimSpace(languages), "-")
-	text += helpers.EscapeText(fmt.Sprintf("🗣 %v\n", languages))
-
-	if movie.HardSubtitle {
-		text += helpers.EscapeText(fmt.Sprintf("💬 %v\n", hardSubtitleLabel))
-	} else if movie.SubtitleLink != "" {
-		text += fmt.Sprintf("💬 [دانلود زیرنویس](%v)\n", hardSubtitleLabel)
+func (h *Handler) prepareMovieCaptionAllQuality(ctx context.Context, movie *entities.Movie) string {
+	text := ""
+	{
+		text = helpers.EscapeText(fmt.Sprintf("📹 %v\n", movie.Title))
+		text += helpers.EscapeText(fmt.Sprintf("🇮🇷 %v\n", movie.FaName))
+		text += helpers.EscapeText(fmt.Sprintf("🏴󠁧󠁢󠁥󠁮󠁧󠁿 %v\n", movie.EnName))
 	}
 
-	if movie.IMDB != 0 {
-		text += helpers.EscapeText(fmt.Sprintf("💯 %v\n", movie.IMDB))
-	}
-
-	hashtags := ""
-	for _, hashtag := range movie.Tags {
-		if !strings.HasPrefix(hashtag, "#") {
-			hashtag = fmt.Sprintf("#%v", hashtag)
+	{
+		text += "\n"
+		text += helpers.EscapeText(fmt.Sprintf("📽 سال تولید: %v\n", movie.Year))
+		languages := ""
+		for _, language := range movie.Languages {
+			languages = fmt.Sprintf("%v - %v", languages, language)
 		}
-		hashtags = fmt.Sprintf("%v %v", hashtags, hashtag)
-	}
-
-	if hashtags != "" {
-		text += helpers.EscapeText(fmt.Sprintf("\n#️⃣ %v\n", hashtags))
-	}
-
-	downloads := ""
-	for _, video := range movie.Videos {
-		download := fmt.Sprintf("⬇️ کیفیت %v: ", video.Quality)
-		if video.DownloadUrl != "" {
-			download += fmt.Sprintf("یا [دانلود](%v)", video.DownloadUrl)
+		languages = strings.Trim(strings.TrimSpace(languages), "-")
+		text += helpers.EscapeText(fmt.Sprintf("🗣 زبان: %v\n", languages))
+		if movie.HardSubtitle {
+			text += helpers.EscapeText(fmt.Sprintf("💬 %v\n", hardSubtitleLabel))
 		}
-		botLink := fmt.Sprintf("https://t.me/Kiwifilm_bot?start=%v", video.ID)
-		download += fmt.Sprintf(" [مشاهده](%v)\n", botLink)
-		downloads += download
+		if movie.ImdbId != "" {
+			rating, err := h.imdbClient.GetRating(ctx, movie.ImdbId)
+			if err != nil {
+				h.log.WithError(err).Errorf("failed to get rating of %v", movie.ImdbId)
+			}
+			text += helpers.EscapeText(fmt.Sprintf("💯 امتیاز: %v/10\n", rating.Data.Title.RatingsSummery))
+		}
 	}
 
-	if downloads != "" {
-		text += fmt.Sprintf("\n%v", downloads)
+	{
+		text += "\n"
+		text += helpers.EscapeText(fmt.Sprintf("📝 %v\n", movie.Presentation))
+	}
+
+	{
+		text += "\n"
+		downloads := ""
+		for _, video := range movie.Videos {
+			download := helpers.EscapeText(fmt.Sprintf("⬇️ کیفیت %v: ", video.Quality))
+			if video.DownloadUrl != "" {
+				download += fmt.Sprintf("یا [دانلود](%v)", video.DownloadUrl)
+			}
+			botLink := fmt.Sprintf("https://t.me/Kiwifilm_bot?start=%v", video.ID)
+			download += fmt.Sprintf(" [مشاهده](%v)\n", botLink)
+			downloads += download
+		}
+
+		if downloads != "" {
+			text += fmt.Sprintf("%v", downloads)
+		}
+
+		if movie.SubtitleLink != "" {
+			text += fmt.Sprintf("💬 [دانلود زیرنویس](%v)\n", hardSubtitleLabel)
+		}
+	}
+
+	{
+		text += "\n"
+		hashtags := ""
+		for _, hashtag := range movie.Tags {
+			if !strings.HasPrefix(hashtag, "#") {
+				hashtag = fmt.Sprintf("#%v", hashtag)
+			}
+			hashtags = fmt.Sprintf("%v %v", hashtags, hashtag)
+		}
+
+		if hashtags != "" {
+			text += helpers.EscapeText(fmt.Sprintf("#️⃣ %v\n", hashtags))
+		}
 	}
 
 	return fmt.Sprintf("%v\n\n@kiwifilm", text)
@@ -439,7 +463,7 @@ func (h *Handler) sendMovieToPublicChannel(ctx context.Context, b *bot.Bot, upda
 		}
 		_, err = b.SendPhoto(ctx, &bot.SendPhotoParams{
 			ChatID:    h.configs.PublicChannelId,
-			Caption:   prepareMovieCaptionAllQuality(movie),
+			Caption:   h.prepareMovieCaptionAllQuality(ctx, movie),
 			Photo:     photo,
 			ParseMode: models.ParseModeMarkdown,
 		})
