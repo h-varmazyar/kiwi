@@ -26,20 +26,15 @@ func NewIMDB(_ context.Context, conf Configs) *IMDB {
 }
 
 func (c *IMDB) GetRating(_ context.Context, movieId string) (*RateResponse, error) {
-	query := fmt.Sprintf(`
-query {
-  title(id: "%v") {
-    ratingsSummary {
-      aggregateRating
-    }
-  }
-}
-`, movieId)
+	queryBody := `{"query":"query {\n  title(id: \"%v\") {\n    ratingsSummary {\n      aggregateRating\n    }\n  }\n}","variables":{}}`
+	query := fmt.Sprintf(queryBody, movieId)
 
 	req, err := http.NewRequest(http.MethodPost, c.configs.BaseUrl, bytes.NewBuffer([]byte(query)))
 	if err != nil {
 		return nil, err
 	}
+
+	req.Header.Add("Content-Type", "application/json")
 
 	resp, err := c.httpClient.Do(req)
 	if err != nil {
@@ -55,6 +50,7 @@ query {
 	if err != nil {
 		return nil, err
 	}
+
 	err = json.Unmarshal(respBody, rateResponse)
 	if err != nil {
 		return nil, err

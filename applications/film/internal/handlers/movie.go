@@ -320,7 +320,7 @@ func (h *Handler) prepareMovieCaptionAllQuality(ctx context.Context, movie *enti
 			if err != nil {
 				h.log.WithError(err).Errorf("failed to get rating of %v", movie.ImdbId)
 			}
-			text += helpers.EscapeText(fmt.Sprintf("💯 امتیاز: %v/10\n", rating.Data.Title.RatingsSummery))
+			text += helpers.EscapeText(fmt.Sprintf("💯 امتیاز: %v/10\n", rating.Data.Title.RatingsSummery.AggregateRating))
 		}
 	}
 
